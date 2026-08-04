@@ -1,0 +1,754 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ระบบสุ่มหรรษา - Randomizer Game Show</title>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Google Fonts: Kanit -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@400;600;800&display=swap" rel="stylesheet">
+    
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- Canvas Confetti -->
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+
+    <style>
+        :root {
+            --primary-red: #ff3b30;
+            --primary-dark-red: #c92a21;
+        }
+        
+        body {
+            font-family: 'Kanit', sans-serif;
+            margin: 0;
+            overflow: hidden;
+            background-color: #ff9a9e; /* Fallback */
+        }
+
+        /* Sunburst Background Effect */
+        .sunburst-bg {
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: repeating-conic-gradient(
+                from 0deg,
+                #ffd54f 0deg 15deg,
+                #ffca28 15deg 30deg
+            );
+            animation: rotateSunburst 40s linear infinite;
+            z-index: -2;
+        }
+
+        @keyframes rotateSunburst {
+            100% { transform: rotate(360deg); }
+        }
+
+        /* Dim Overlay for Rolling */
+        .dim-overlay {
+            position: absolute;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.6);
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.3s ease;
+            z-index: -1;
+        }
+        .dim-overlay.active {
+            opacity: 1;
+        }
+
+        /* White Flash Effect */
+        .flash-overlay {
+            position: absolute;
+            inset: 0;
+            background: white;
+            opacity: 0;
+            pointer-events: none;
+            z-index: 50;
+            transition: opacity 0.5s ease-out;
+        }
+        .flash-overlay.flash {
+            opacity: 1;
+            transition: none; /* Instant flash */
+        }
+
+        /* 3D Chalkboard Frame */
+        .chalkboard-container {
+            background-color: #1a472a;
+            border: 16px solid #8b5a2b;
+            border-top-color: #a06e3d;
+            border-left-color: #a06e3d;
+            border-bottom-color: #4a2f14;
+            border-right-color: #4a2f14;
+            box-shadow: 0 15px 35px rgba(0,0,0,0.5), inset 0 0 40px rgba(0,0,0,0.8);
+            border-radius: 16px;
+            position: relative;
+        }
+        
+        /* Chalk Dust Texture Effect */
+        .chalkboard-container::before {
+            content: "";
+            position: absolute;
+            inset: 0;
+            background-image: radial-gradient(circle, rgba(255,255,255,0.05) 10%, transparent 10%), 
+                              radial-gradient(circle, rgba(255,255,255,0.05) 10%, transparent 10%);
+            background-size: 8px 8px;
+            background-position: 0 0, 4px 4px;
+            opacity: 0.3;
+            pointer-events: none;
+        }
+
+        /* Result Text Style */
+        .result-text {
+            font-family: 'Kanit', sans-serif;
+            font-weight: 800; /* Extrabold */
+            color: #ffffff;
+            text-shadow: 0 0 10px rgba(255,255,255,0.5), 2px 2px 0 #000;
+            transition: all 0.1s;
+        }
+
+        /* Slot Machine Effect */
+        .slot-blur {
+            filter: blur(4px);
+            transform: scale(1.1) translateY(random(10px));
+            opacity: 0.8;
+        }
+
+        /* Winner Pop Effect */
+        .winner-pop {
+            animation: popText 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275) both;
+            color: #ffde00 !important;
+            text-shadow: 0 0 20px #ffde00, 3px 3px 0 #000, 0 0 40px #ff7b00 !important;
+        }
+
+        @keyframes popText {
+            0% { transform: scale(0.5); opacity: 0; }
+            50% { transform: scale(1.3); }
+            100% { transform: scale(1); opacity: 1; }
+        }
+
+        /* 3D Big Button */
+        .btn-3d {
+            font-family: 'Kanit', sans-serif;
+            font-weight: 800;
+            background: linear-gradient(to bottom, #ff5e00, #ff2a00);
+            box-shadow: 0 10px 0 #991b00, 0 15px 20px rgba(0,0,0,0.4), inset 0 2px 0 rgba(255,255,255,0.4);
+            transition: all 0.1s ease;
+            transform: translateY(0);
+        }
+        
+        .btn-3d:active, .btn-3d.pressed {
+            box-shadow: 0 2px 0 #991b00, 0 5px 10px rgba(0,0,0,0.4), inset 0 2px 0 rgba(255,255,255,0.4);
+            transform: translateY(8px);
+        }
+        
+        /* Disabled State */
+        .btn-disabled {
+            background: linear-gradient(to bottom, #9ca3af, #6b7280) !important;
+            box-shadow: 0 10px 0 #4b5563, 0 15px 20px rgba(0,0,0,0.4) !important;
+            cursor: not-allowed;
+            color: #d1d5db;
+        }
+
+        /* Robot Animations */
+        .robot-float {
+            animation: float 4s ease-in-out infinite;
+        }
+        .robot-blink {
+            animation: blinkScale 0.3s infinite alternate;
+            filter: drop-shadow(0 0 15px rgba(255, 255, 255, 0.8));
+        }
+
+        @keyframes float {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-20px); }
+        }
+        @keyframes blinkScale {
+            0% { transform: scale(1) translateY(-10px); }
+            100% { transform: scale(1.05) translateY(-10px); }
+        }
+
+        /* Speech Bubble */
+        .speech-bubble {
+            position: relative;
+            background: white;
+            border-radius: .4em;
+            font-weight: 800;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+        }
+        .speech-bubble:after {
+            content: '';
+            position: absolute;
+            bottom: 0;
+            left: 50%;
+            width: 0;
+            height: 0;
+            border: 15px solid transparent;
+            border-top-color: white;
+            border-bottom: 0;
+            border-left: 0;
+            margin-left: -7.5px;
+            margin-bottom: -15px;
+        }
+        
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #f1f1f1; 
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #888; 
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #555; 
+        }
+
+    </style>
+</head>
+<body class="text-gray-800 h-screen w-screen flex flex-col relative select-none">
+
+    <div class="sunburst-bg"></div>
+    <div id="dimOverlay" class="dim-overlay"></div>
+    <div id="flashOverlay" class="flash-overlay"></div>
+
+    <div class="absolute top-4 right-4 z-20">
+        <button id="btnSettings" class="bg-white p-3 rounded-full shadow-lg text-blue-600 hover:text-blue-800 hover:scale-110 transition-transform">
+            <i class="fa-solid fa-gear text-2xl"></i>
+        </button>
+    </div>
+
+    <div class="flex-1 flex flex-col md:flex-row items-center justify-center p-4 z-10 gap-8 md:gap-16 w-full max-w-6xl mx-auto h-full">
+        
+        <!-- Left Side: Robot Character -->
+        <div class="relative flex flex-col items-center justify-end w-48 md:w-64 mt-10 md:mt-0">
+            <!-- Speech Bubble -->
+            <div id="speechBubble" class="speech-bubble px-4 py-3 text-lg md:text-xl text-center text-blue-700 mb-6 w-48 animate-bounce">
+                พร้อมแล้ว!
+            </div>
+            <!-- Robot Image -->
+            <img id="robotImg" src="https://raw.githubusercontent.com/Tarikul-Islam-Anik/Animated-Fluent-Emojis/master/Emojis/Smilies/Robot.png" alt="Robot" class="w-40 md:w-56 robot-float drop-shadow-2xl">
+        </div>
+
+        <!-- Center: Chalkboard and Controls -->
+        <div class="flex flex-col items-center w-full max-w-2xl">
+            
+            <!-- The Chalkboard -->
+            <div class="chalkboard-container w-full aspect-[4/3] sm:aspect-video flex items-center justify-center p-8 mb-10 z-10">
+                <div id="resultDisplay" class="result-text text-6xl sm:text-8xl md:text-9xl text-center break-words w-full px-4 truncate">
+                    ?
+                </div>
+            </div>
+
+            <!-- Big 3D Button -->
+            <button id="btnRoll" class="btn-3d text-white px-10 py-4 text-3xl sm:text-5xl rounded-full z-10 tracking-wide border-2 border-orange-300">
+                <i class="fa-solid fa-dice me-3"></i>สุ่มเลย!
+            </button>
+            
+        </div>
+    </div>
+
+    <div class="bg-white/90 backdrop-blur border-t-4 border-blue-500 w-full p-4 z-10 shadow-[0_-5px_20px_rgba(0,0,0,0.1)] flex flex-col h-1/4 max-h-[200px]">
+        <div class="flex justify-between items-center mb-2">
+            <h3 class="text-xl font-bold font-kanit text-gray-700">
+                <i class="fa-solid fa-clock-rotate-left mr-2"></i>ประวัติผู้ที่ถูกสุ่มไปแล้ว (<span id="remainingCount">0</span> เหลืออยู่)
+            </h3>
+            <button id="btnReset" class="bg-red-500 hover:bg-red-600 text-white font-bold py-1 px-4 rounded shadow">
+                <i class="fa-solid fa-rotate-right mr-1"></i> เริ่มรอบใหม่
+            </button>
+        </div>
+        <div id="historyContainer" class="flex-1 overflow-y-auto flex flex-wrap gap-2 content-start pb-2">
+            <div class="text-gray-400 italic w-full text-center mt-4">ยังไม่มีประวัติการสุ่ม</div>
+        </div>
+    </div>
+
+    <div id="settingsModal" class="fixed inset-0 bg-black/60 z-50 flex items-center justify-center hidden opacity-0 transition-opacity duration-300">
+        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md mx-4 overflow-hidden transform scale-95 transition-transform duration-300" id="modalContent">
+            
+            <!-- Modal Header -->
+            <div class="bg-blue-600 text-white p-4 flex justify-between items-center">
+                <h2 class="text-2xl font-kanit font-extrabold"><i class="fa-solid fa-sliders mr-2"></i>ตั้งค่าการสุ่ม</h2>
+                <button id="btnCloseModal" class="text-white hover:text-gray-200 focus:outline-none">
+                    <i class="fa-solid fa-xmark text-2xl"></i>
+                </button>
+            </div>
+
+            <!-- Modal Body: Tabs -->
+            <div class="p-0">
+                <div class="flex border-b">
+                    <button class="tab-btn flex-1 py-3 font-bold text-blue-600 border-b-4 border-blue-600 bg-blue-50 focus:outline-none transition-colors" data-target="tabNumbers">
+                        <i class="fa-solid fa-list-ol mr-2"></i> สุ่มเลขที่
+                    </button>
+                    <button class="tab-btn flex-1 py-3 font-bold text-gray-500 border-b-4 border-transparent hover:bg-gray-50 focus:outline-none transition-colors" data-target="tabNames">
+                        <i class="fa-solid fa-users mr-2"></i> วางรายชื่อ
+                    </button>
+                </div>
+
+                <div class="p-6">
+                    <!-- Tab 1: Numbers -->
+                    <div id="tabNumbers" class="tab-content block">
+                        <div class="flex items-center space-x-4 mb-4">
+                            <div class="flex-1">
+                                <label class="block text-gray-700 text-sm font-bold mb-2">เริ่มจากเลข</label>
+                                <input type="number" id="inputStartNum" value="1" min="1" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:ring-2 focus:ring-blue-500 text-lg font-bold">
+                            </div>
+                            <div class="flex-1">
+                                <label class="block text-gray-700 text-sm font-bold mb-2">ถึงเลข</label>
+                                <input type="number" id="inputEndNum" value="30" min="1" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:ring-2 focus:ring-blue-500 text-lg font-bold">
+                            </div>
+                        </div>
+                        <p class="text-xs text-gray-500">* ระบบจะสุ่มตัวเลขในช่วงที่กำหนด โดยไม่ซ้ำกันจนกว่าจะเริ่มรอบใหม่</p>
+                    </div>
+
+                    <!-- Tab 2: Names -->
+                    <div id="tabNames" class="tab-content hidden">
+                        <label class="block text-gray-700 text-sm font-bold mb-2">วางรายชื่อ (บรรทัดละ 1 ชื่อ)</label>
+                        <textarea id="inputNames" rows="5" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:ring-2 focus:ring-blue-500 font-kanit" placeholder="สมชาย&#10;สมหญิง&#10;มานะ&#10;มานี"></textarea>
+                        <p class="text-xs text-gray-500 mt-2">* หากมีชื่อว่างเปล่าหรือซ้ำ ระบบจะจัดการกรองให้เบื้องต้น</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Modal Footer -->
+            <div class="bg-gray-100 p-4 flex justify-end">
+                <button id="btnSaveSettings" class="bg-green-500 hover:bg-green-600 text-white font-extrabold font-kanit py-2 px-6 rounded-lg shadow-md transition-colors text-lg">
+                    <i class="fa-solid fa-check mr-2"></i>บันทึกและเริ่มใหม่
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // --- State Management ---
+        let currentMode = 'numbers'; // 'numbers' | 'names'
+        let numStart = 1;
+        let numEnd = 30;
+        let namesList = [];
+        let itemPool = [];
+        let historyList = [];
+        let isRolling = false;
+        
+        let slotInterval;
+        let audioContext = null;
+        let drumNodes = null; // Store nodes to stop them
+
+        // --- DOM Elements ---
+        const resultDisplay = document.getElementById('resultDisplay');
+        const btnRoll = document.getElementById('btnRoll');
+        const robotImg = document.getElementById('robotImg');
+        const speechBubble = document.getElementById('speechBubble');
+        const dimOverlay = document.getElementById('dimOverlay');
+        const flashOverlay = document.getElementById('flashOverlay');
+        const historyContainer = document.getElementById('historyContainer');
+        const remainingCount = document.getElementById('remainingCount');
+        const btnReset = document.getElementById('btnReset');
+        
+        // Modal Elements
+        const modal = document.getElementById('settingsModal');
+        const modalContent = document.getElementById('modalContent');
+        const btnSettings = document.getElementById('btnSettings');
+        const btnCloseModal = document.getElementById('btnCloseModal');
+        const btnSaveSettings = document.getElementById('btnSaveSettings');
+        const tabBtns = document.querySelectorAll('.tab-btn');
+        const tabContents = document.querySelectorAll('.tab-content');
+        
+        const inputStartNum = document.getElementById('inputStartNum');
+        const inputEndNum = document.getElementById('inputEndNum');
+        const inputNames = document.getElementById('inputNames');
+
+        // --- Initialization ---
+        function initApp() {
+            generatePool();
+            updateUI();
+        }
+
+        // --- Core Logic ---
+        function generatePool() {
+            itemPool = [];
+            if (currentMode === 'numbers') {
+                for (let i = numStart; i <= numEnd; i++) {
+                    itemPool.push(i.toString());
+                }
+            } else if (currentMode === 'names') {
+                itemPool = [...namesList];
+            }
+            historyList = []; // Reset history when pool resets
+        }
+
+        function resetRound() {
+            generatePool();
+            resultDisplay.innerText = "?";
+            resultDisplay.className = "result-text text-6xl sm:text-8xl md:text-9xl text-center break-words w-full px-4 truncate";
+            speechBubble.innerText = "พร้อมแล้ว!";
+            robotImg.className = "w-40 md:w-56 robot-float drop-shadow-2xl";
+            updateUI();
+            
+            // Audio init trigger attempt
+            initAudioContext();
+        }
+
+        function updateUI() {
+            remainingCount.innerText = itemPool.length;
+            
+            // Update History List
+            if (historyList.length === 0) {
+                historyContainer.innerHTML = '<div class="text-gray-400 italic w-full text-center mt-4">ยังไม่มีประวัติการสุ่ม</div>';
+            } else {
+                historyContainer.innerHTML = '';
+                historyList.forEach((item, index) => {
+                    const badge = document.createElement('div');
+                    badge.className = 'bg-blue-100 text-blue-800 border border-blue-300 font-extrabold px-3 py-1 rounded-full shadow-sm text-sm sm:text-base animate-fade-in';
+                    badge.innerText = `${historyList.length - index}. ${item}`;
+                    // Insert at beginning to show newest first
+                    historyContainer.insertBefore(badge, historyContainer.firstChild);
+                });
+            }
+
+            // Update Button State
+            if (itemPool.length === 0) {
+                btnRoll.classList.add('btn-disabled');
+                btnRoll.innerHTML = '<i class="fa-solid fa-ban me-3"></i>หมดแล้ว!';
+            } else {
+                btnRoll.classList.remove('btn-disabled');
+                btnRoll.innerHTML = '<i class="fa-solid fa-dice me-3"></i>สุ่มเลย!';
+            }
+        }
+
+        // --- Audio Synthesizer (Web Audio API) ---
+        function initAudioContext() {
+            if (!audioContext) {
+                const AudioContext = window.AudioContext || window.webkitAudioContext;
+                audioContext = new AudioContext();
+            }
+            if (audioContext.state === 'suspended') {
+                audioContext.resume();
+            }
+        }
+
+        function playDrumRoll() {
+            initAudioContext();
+            if(!audioContext) return null;
+
+            // Generate Noise Buffer for drum roll sound
+            const bufferSize = audioContext.sampleRate * 4; // Max 4 seconds
+            const buffer = audioContext.createBuffer(1, bufferSize, audioContext.sampleRate);
+            const output = buffer.getChannelData(0);
+            for (let i = 0; i < bufferSize; i++) {
+                output[i] = Math.random() * 2 - 1; // White noise
+            }
+
+            const noiseSource = audioContext.createBufferSource();
+            noiseSource.buffer = buffer;
+
+            // Lowpass filter to make it sound like a rumble/drum
+            const filter = audioContext.createBiquadFilter();
+            filter.type = 'lowpass';
+            filter.frequency.value = 250; 
+
+            const mainGain = audioContext.createGain();
+            mainGain.gain.value = 1.5;
+
+            // LFO to simulate rapid hits (Volume modulation)
+            const lfo = audioContext.createOscillator();
+            lfo.type = 'square';
+            lfo.frequency.value = 16; // 16 hits per second
+
+            const lfoGain = audioContext.createGain();
+            lfoGain.gain.value = 1;
+
+            // Connections
+            lfo.connect(lfoGain);
+            lfoGain.connect(mainGain.gain); // Modulate main gain
+
+            noiseSource.connect(filter);
+            filter.connect(mainGain);
+            mainGain.connect(audioContext.destination);
+
+            noiseSource.start();
+            lfo.start();
+
+            return { noiseSource, lfo };
+        }
+
+        function stopDrumRoll(nodes) {
+            if (nodes && nodes.noiseSource && nodes.lfo) {
+                try {
+                    nodes.noiseSource.stop();
+                    nodes.lfo.stop();
+                } catch(e) {}
+            }
+        }
+
+        function playFanfare() {
+            initAudioContext();
+            if(!audioContext) return;
+
+            const now = audioContext.currentTime;
+            // Notes array: Frequencies for a fanfare (e.g. C4, E4, G4, C5)
+            const notes = [261.63, 329.63, 392.00, 523.25];
+            const startTimes = [0, 0.15, 0.30, 0.45];
+            const durations = [0.1, 0.1, 0.1, 0.8]; // Last note holds longer
+
+            notes.forEach((freq, i) => {
+                const osc = audioContext.createOscillator();
+                const gain = audioContext.createGain();
+                
+                osc.type = 'sawtooth'; // Brassy sound
+                osc.frequency.value = freq;
+
+                osc.connect(gain);
+                gain.connect(audioContext.destination);
+
+                const t = now + startTimes[i];
+                const d = durations[i];
+
+                // Envelope
+                gain.gain.setValueAtTime(0, t);
+                gain.gain.linearRampToValueAtTime(0.3, t + 0.05); // Attack
+                gain.gain.setValueAtTime(0.3, t + d - 0.1); // Sustain
+                gain.gain.linearRampToValueAtTime(0, t + d); // Release
+
+                osc.start(t);
+                osc.stop(t + d);
+            });
+        }
+
+        // --- Rolling Animation & Logic ---
+        function startRolling() {
+            if (isRolling || itemPool.length === 0) return;
+            isRolling = true;
+            
+            initAudioContext();
+            
+            // Visual Updates - Start
+            btnRoll.classList.add('pressed');
+            dimOverlay.classList.add('active');
+            speechBubble.innerText = "กำลังค้นหา...";
+            
+            // Robot Animation Change
+            robotImg.classList.remove('robot-float');
+            robotImg.classList.add('robot-blink');
+            
+            // Reset text style
+            resultDisplay.className = "result-text text-6xl sm:text-8xl md:text-9xl text-center break-words w-full px-4 truncate slot-blur";
+
+            // Audio: Play Drum Roll
+            drumNodes = playDrumRoll();
+
+            // Slot Machine Effect
+            let counter = 0;
+            slotInterval = setInterval(() => {
+                // Show random item from pool or fallback
+                let tempSource = itemPool.length > 0 ? itemPool : historyList;
+                if(tempSource.length === 0) tempSource = ["-"];
+                
+                const randomIdx = Math.floor(Math.random() * tempSource.length);
+                resultDisplay.innerText = tempSource[randomIdx];
+                counter++;
+            }, 50);
+
+            // Stop after 2.5 seconds
+            setTimeout(stopRolling, 2500);
+        }
+
+        function stopRolling() {
+            clearInterval(slotInterval);
+            
+            // Pick Winner
+            const winnerIndex = Math.floor(Math.random() * itemPool.length);
+            const winner = itemPool[winnerIndex];
+            
+            // Remove from pool, add to history
+            itemPool.splice(winnerIndex, 1);
+            historyList.push(winner);
+            
+            // Visual Updates - Winner
+            resultDisplay.innerText = winner;
+            resultDisplay.className = "result-text text-6xl sm:text-8xl md:text-9xl text-center break-words w-full px-4 winner-pop";
+            
+            dimOverlay.classList.remove('active');
+            btnRoll.classList.remove('pressed');
+            speechBubble.innerText = "ว้าว!! ยินดีด้วย!";
+            
+            robotImg.classList.remove('robot-blink');
+            robotImg.classList.add('robot-float');
+
+            // Flash Effect
+            flashOverlay.classList.add('flash');
+            setTimeout(() => {
+                flashOverlay.classList.remove('flash');
+            }, 50);
+
+            // Audio Updates
+            stopDrumRoll(drumNodes);
+            playFanfare();
+
+            // Fire Confetti
+            fireConfetti();
+
+            // Update UI State
+            updateUI();
+            isRolling = false;
+        }
+
+        function fireConfetti() {
+            var duration = 3 * 1000;
+            var animationEnd = Date.now() + duration;
+            var defaults = { startVelocity: 30, spread: 360, ticks: 60, zIndex: 100 };
+
+            function randomInRange(min, max) {
+                return Math.random() * (max - min) + min;
+            }
+
+            var interval = setInterval(function() {
+                var timeLeft = animationEnd - Date.now();
+
+                if (timeLeft <= 0) {
+                    return clearInterval(interval);
+                }
+
+                var particleCount = 50 * (timeLeft / duration);
+                confetti(Object.assign({}, defaults, { particleCount,
+                    origin: { x: randomInRange(0.1, 0.3), y: Math.random() - 0.2 }
+                }));
+                confetti(Object.assign({}, defaults, { particleCount,
+                    origin: { x: randomInRange(0.7, 0.9), y: Math.random() - 0.2 }
+                }));
+            }, 250);
+        }
+
+        // --- Settings Modal Logic ---
+        function openSettings() {
+            if(isRolling) return;
+            modal.classList.remove('hidden');
+            // Small delay to allow CSS display to apply before opacity transition
+            setTimeout(() => {
+                modal.classList.remove('opacity-0');
+                modalContent.classList.remove('scale-95');
+                modalContent.classList.add('scale-100');
+            }, 10);
+            
+            // Sync current inputs with state
+            if(currentMode === 'numbers'){
+                inputStartNum.value = numStart;
+                inputEndNum.value = numEnd;
+                switchTab('tabNumbers');
+            } else {
+                inputNames.value = namesList.join('\n');
+                switchTab('tabNames');
+            }
+        }
+
+        function closeSettings() {
+            modal.classList.add('opacity-0');
+            modalContent.classList.remove('scale-100');
+            modalContent.classList.add('scale-95');
+            setTimeout(() => {
+                modal.classList.add('hidden');
+            }, 300);
+        }
+
+        function switchTab(targetId) {
+            // Update buttons
+            tabBtns.forEach(btn => {
+                if (btn.dataset.target === targetId) {
+                    btn.classList.add('text-blue-600', 'border-blue-600', 'bg-blue-50');
+                    btn.classList.remove('text-gray-500', 'border-transparent', 'hover:bg-gray-50');
+                } else {
+                    btn.classList.remove('text-blue-600', 'border-blue-600', 'bg-blue-50');
+                    btn.classList.add('text-gray-500', 'border-transparent', 'hover:bg-gray-50');
+                }
+            });
+
+            // Update contents
+            tabContents.forEach(content => {
+                if (content.id === targetId) {
+                    content.classList.remove('hidden');
+                    content.classList.add('block');
+                } else {
+                    content.classList.add('hidden');
+                    content.classList.remove('block');
+                }
+            });
+        }
+
+        function saveSettings() {
+            // Determine active tab to set mode
+            const activeTab = document.querySelector('.tab-btn.text-blue-600').dataset.target;
+            
+            if (activeTab === 'tabNumbers') {
+                currentMode = 'numbers';
+                let start = parseInt(inputStartNum.value) || 1;
+                let end = parseInt(inputEndNum.value) || 30;
+                
+                if (start > end) {
+                    // Swap if start is greater
+                    let temp = start;
+                    start = end;
+                    end = temp;
+                }
+                numStart = start;
+                numEnd = end;
+                
+            } else {
+                currentMode = 'names';
+                // Parse textarea, split by newline, trim, remove empty lines
+                const rawNames = inputNames.value.split('\n');
+                namesList = rawNames.map(name => name.trim()).filter(name => name !== '');
+                
+                // Remove exact duplicates to prevent weird behaviors (Optional, but good practice)
+                namesList = [...new Set(namesList)];
+                
+                if (namesList.length === 0) {
+                    alert("กรุณาใส่รายชื่ออย่างน้อย 1 ชื่อ");
+                    return;
+                }
+            }
+            
+            closeSettings();
+            resetRound();
+        }
+
+        // --- Event Listeners ---
+        btnRoll.addEventListener('click', startRolling);
+        btnReset.addEventListener('click', () => {
+            if(!isRolling && confirm('ยืนยันที่จะล้างประวัติและเริ่มรอบใหม่ทั้งหมดหรือไม่?')) {
+                resetRound();
+            }
+        });
+        
+        btnSettings.addEventListener('click', openSettings);
+        btnCloseModal.addEventListener('click', closeSettings);
+        btnSaveSettings.addEventListener('click', saveSettings);
+        
+        tabBtns.forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                switchTab(e.currentTarget.dataset.target);
+            });
+        });
+
+        // Close modal on click outside
+        modal.addEventListener('click', (e) => {
+            if (e.target === modal) {
+                closeSettings();
+            }
+        });
+
+        // Initialize Application
+        initApp();
+
+    </script>
+</body>
+</html>
